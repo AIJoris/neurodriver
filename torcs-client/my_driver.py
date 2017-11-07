@@ -1,6 +1,8 @@
 from pytocl.driver import Driver
 from pytocl.car import State, Command
 from intelligence.learning import train_network
+import torch
+from torch.autograd import Variable
 
 # imports from driver.py
 import logging
@@ -32,15 +34,40 @@ class MyDriver(Driver):
         lot of inputs. But it will get the car (if not disturbed by other
         drivers) successfully driven along the race track.
         """
-        print(carstate.speed_x,carstate.speed_y,carstate.speed_z)
         command = Command()
-        self.steer(carstate, 0.0, command)
 
+        # Get sensor data and construct features for prediction
+        speed = [carstate.speed_x]
+        track_pos = [carstate.distance_from_center]
+        angle = [carstate.angle]
+        track_edges = list(carstate.distances_from_edge)
+        features = Variable(torch.FloatTensor(speed+track_pos+angle+track_edges)).float()
+
+        # Predict
+        pred = self.net(features)
+        acc_pred = pred[0]
+        brake_pred = pred[1]
+        steer_pred = pred[2]
+
+        # Prepare gear
+        if command.accelerator > 0:
+            if carstate.rpm > 8000:
+                command.gear = carstate.gear + 1
+        if carstate.rpm < 2500:
+            command.gear = carstate.gear - 1
+        if not command.gear:
+            command.gear = carstate.gear or 1
+
+        # Prepare command
+        command.accelerator = acc_pred
+        command.brake = brake_pred
+        command.steering = steer_pred
+
+        # self.steer(carstate, 0.0, command)
         # ACC_LATERAL_MAX = 6400 * 5
         # v_x = min(80, math.sqrt(ACC_LATERAL_MAX / abs(command.steering)))
-        v_x = 80
-
-        self.accelerate(carstate, v_x, command)
+        # v_x = 80
+        # self.accelerate(carstate, v_x, command)
 
         if self.data_logger:
             self.data_logger.log(carstate, command)

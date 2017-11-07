@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+
 # Fake data
 # torch.manual_seed(1)
 # x = torch.unsqueeze(torch.linspace(-1, 1, 100), dim=1)  # x data (tensor), shape=(100, 1)
@@ -13,7 +14,7 @@ import numpy as np
 # plt.scatter(x.data.numpy(), y.data.numpy())
 # plt.show()
 
-def load_data(fpath = 'f-speedway.csv'):
+def load_data(fpath = 'intelligence/f-speedway.csv'):
     df = pd.read_csv(fpath)
     header = np.array(df.columns)
     data = np.array(df)
@@ -44,17 +45,16 @@ def train_network():
             x = self.predict(x)             # linear output
             return x
 
-    net = Net(n_feature=21, n_hidden=10, n_output=3)
+    net = Net(n_feature=22, n_hidden=10, n_output=3)
     print(net)
     optimizer = torch.optim.SGD(net.parameters(), lr=0.5)
     loss_func = torch.nn.MSELoss()  # this is for regression mean squared loss
 
     # Train network
-    print(features.data.shape[0])
     for t in range(30):
         prediction = net(features)     # input x and predict based on x
         loss = loss_func(prediction, targets)     # must be (1. nn output, 2. target)
         optimizer.zero_grad()   # clear gradients for next train
         loss.backward()         # backpropagation, compute gradients
         optimizer.step()        # apply gradients
-    return net, t_head, f_head
+    return net
