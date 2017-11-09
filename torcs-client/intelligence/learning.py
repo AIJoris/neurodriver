@@ -5,16 +5,11 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import os
 
-# Fake data
-# torch.manual_seed(1)
-# x = torch.unsqueeze(torch.linspace(-1, 1, 100), dim=1)  # x data (tensor), shape=(100, 1)
-# y = x.pow(2) + 0.2*torch.rand(x.size())                 # noisy y data (tensor), shape=(100, 1)
-# x, y = Variable(x), Variable(y)
-# plt.scatter(x.data.numpy(), y.data.numpy())
-# plt.show()
-
-def load_data(fpath = 'intelligence/f-speedway.csv'):
+def load_data(fpath = 'f-speedway.csv'):
+    if os.path.relpath(".","..") != 'intelligence':
+        fpath = 'intelligence/'+fpath
     df = pd.read_csv(fpath)
     header = np.array(df.columns)
     data = np.array(df)
@@ -58,3 +53,6 @@ def train_network():
         loss.backward()         # backpropagation, compute gradients
         optimizer.step()        # apply gradients
     return net
+
+t_head,f_head,t,f = load_data()
+net = train_network
