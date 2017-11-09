@@ -59,15 +59,19 @@ class MyDriver(Driver):
             command.gear = carstate.gear or 1
 
         # Prepare command
-        command.accelerator = acc_pred
-        command.brake = brake_pred
-        command.steering = steer_pred
+        command.accelerator = acc_pred.data[0]
+        command.brake = brake_pred.data[0]/10
+        command.steering = steer_pred.data[0]
+        # var = "acc: {}, brake: {}, steer: {}".format(command.accelerator,command.brake, command.steering)
+        # print('+', var)
 
         # self.steer(carstate, 0.0, command)
         # ACC_LATERAL_MAX = 6400 * 5
         # v_x = min(80, math.sqrt(ACC_LATERAL_MAX / abs(command.steering)))
         # v_x = 80
         # self.accelerate(carstate, v_x, command)
+        # var = "acc: {}, brake: {}, steer: {}".format(command.accelerator,command.brake, command.steering)
+        # print('-', var)
 
         if self.data_logger:
             self.data_logger.log(carstate, command)
