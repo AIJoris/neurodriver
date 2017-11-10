@@ -110,4 +110,5 @@ def train_recurrent_network():
         optimizer.step()        # apply gradients
     return net
 
-train_recurrent_network()
+if __name__ == "__main__":
+    train_recurrent_network()

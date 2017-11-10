@@ -15,20 +15,25 @@ class AutoEncoder(nn.Module):
         x = F.sigmoid(self.hidden(input))
         return self.output(x)
 
-net = AutoEncoder(n_feature=22, n_hidden=10)
-optimizer = torch.optim.SGD(net.parameters(), lr=0.5)
-loss_func = torch.nn.MSELoss()  # this is for regression mean squared loss
-print(net)
+def train_ae(n_its=30, verbose=True):
+    net = AutoEncoder(n_feature=22, n_hidden=10)
+    optimizer = torch.optim.SGD(net.parameters(), lr=0.5)
+    loss_func = torch.nn.MSELoss()  # this is for regression mean squared loss
+    print(net)
 
-t_head, f_head, targets, features = load_data()
-targets = Variable(torch.from_numpy(features)).float()
-features = Variable(torch.from_numpy(features)).float()
+    t_head, f_head, targets, features = load_data()
+    targets = Variable(torch.from_numpy(features)).float()
+    features = Variable(torch.from_numpy(features)).float()
 
-# Train network
-for t in range(30):
-    prediction = net(features)     # input x and predict based on x
-    loss = loss_func(prediction, targets)     # must be (1. nn output, 2. target)
-    print("Loss at step {}: {}".format(t,loss))
-    optimizer.zero_grad()   # clear gradients for next train
-    loss.backward()         # backpropagation, compute gradients
-    optimizer.step()        # apply gradients
+    # Train network
+    for t in range(n_its):
+        prediction = net(features)     # input x and predict based on x
+        loss = loss_func(prediction, targets)     # must be (1. nn output, 2. target)
+        if verbose: print("Loss at step {}: {}".format(t,loss))
+        optimizer.zero_grad()   # clear gradients for next train
+        loss.backward()         # backpropagation, compute gradients
+        optimizer.step()        # apply gradients
+    return net
+
+if __name__ == '__main__':
+    train_ae()
