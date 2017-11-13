@@ -1,6 +1,6 @@
 from pytocl.driver import Driver
 from pytocl.car import State, Command
-from intelligence.learning import train_network
+from intelligence.learning import train_ff_network
 import torch
 from torch.autograd import Variable
 
@@ -24,7 +24,7 @@ class MyDriver(Driver):
             ProportionalController(3.7),
         )
         self.data_logger = DataLogWriter() if logdata else None
-        self.net = train_network()
+        self.net = train_ff_network()
 
     def drive(self, carstate: State) -> Command:
         """
@@ -42,7 +42,7 @@ class MyDriver(Driver):
         angle = [carstate.angle]
         track_edges = list(carstate.distances_from_edge)
         features = Variable(torch.FloatTensor(speed+track_pos+angle+track_edges)).float()
-
+        print(track_edges)
         # Predict
         pred = self.net(features)
         acc_pred = pred[0]
