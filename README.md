@@ -16,3 +16,4 @@
 - How do we implement an Echo State Network? There aren't any good looking packages that we can find.
 
 ## Planning week 3
+test
