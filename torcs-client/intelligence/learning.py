@@ -28,7 +28,6 @@ class FeedForwardNet(nn.Module):
 class RNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(RNN, self).__init__()
-
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
@@ -38,15 +37,78 @@ class RNN(nn.Module):
 
     def forward(self, input, hidden):
         combined = torch.cat((input, hidden), 1)
-        hidden = self.i2h(combined)
+        hidden, output = self.i2h(combined)
         output = self.i2o(combined)
         return output, hidden
 
     def init_hidden(self):
         return Variable(torch.zeros(1, self.hidden_size))
 
+class LSTM(nn.Module):
+    def __init__(self, n_features, hidden_dim, output_size):
+        super(LSTM, self).__init__()
+        self.hidden_dim = hidden_dim
+
+        # The LSTM takes feature vectors as inputs, and outputs hidden states
+        # with dimensionality hidden_dim.
+        self.lstm = nn.LSTM(n_features, hidden_dim)
+
+        # The linear layer that maps from hidden state space to command space
+        self.hidden2command = nn.Linear(hidden_dim, output_size)
+        self.hidden = self.init_hidden()
+
+    def init_hidden(self):
+        # return Variable(torch.zeros(1, 1, self.hidden_dim))
+        return (Variable(torch.zeros(1, 1, self.hidden_dim)),
+                Variable(torch.zeros(1, 1, self.hidden_dim)))
+
+    def forward(self, features, n_timesteps):
+        lstm_out, self.hidden = self.lstm(features.view(n_timesteps, 1, -1), self.hidden)
+        command = self.hidden2command(lstm_out.view(n_timesteps, -1))
+        return command
+
+def train_lstm(N_TIMESTEPS = 3):
+    # Load our data
+    t_head, f_head, t, f = load_data()
+    print(t_head,t)
+    print(f_head,f)
+
+    # Create LSTM
+    HIDDEN_DIM = 32
+    L_RATE = 0.01
+    n_output = t.size()[1]
+    n_features = f.size()[1]
+    lstm = LSTM(n_features, HIDDEN_DIM, n_output)
+    loss_function = torch.nn.MSELoss()
+    loss_vec = []
+    optimizer = torch.optim.SGD(lstm.parameters(), lr = L_RATE)
+    print(lstm)
+    for epoch in range(10):
+        for i in range(N_TIMESTEPS,n_features+1):
+            # Step 1. Remember that Pytorch accumulates gradients.
+            # We need to clear them out before each instance
+            lstm.zero_grad()
+
+            # Also, we need to clear out the hidden state of the LSTM,
+            # detaching it from its history on the last instance.
+            lstm.hidden = lstm.init_hidden()
+
+            # Step 2. Prepare data (concat multiple time steps)
+            features_timesteps = f[i-N_TIMESTEPS:i,:]
+
+            # Step 3. Run our forward pass.
+            command = lstm(features_timesteps, N_TIMESTEPS)
+
+            # Step 4. Compute the loss, gradients, and update the parameters by
+            #  calling optimizer.step()
+            loss = loss_function(command, t[i-N_TIMESTEPS:i])
+            loss_vec.append(loss.data[0])
+            loss.backward()
+            optimizer.step()
+    return lstm, loss_vec
+
 # Load training data
-def load_data(fpath = 'f-speedway.csv'):
+def load_data(fpath = 'alpine-1.csv'):
     # alpine-1
     if os.path.relpath(".","..") != 'intelligence':
         fpath = 'intelligence/'+fpath
@@ -78,7 +140,7 @@ def train_ff_network():
         optimizer.step()        # apply gradients
     return net
 
-def train_rnn():
+def train_rnn(n_timesteps_used = 2):
     # Load our data
     t_head, f_head, t, f = load_data()
     print(t_head,t)
@@ -91,29 +153,35 @@ def train_rnn():
     # optimizer = torch.optim.SGD(rnn.parameters(), lr=0.5)
 
     # Train network
-    n_iters = 10000
-    n_timesteps = 5
+    print('Training RNN...')
+    n_iters = 1000
+    learning_rate = 0.0000001
+    loss_vec = []
     for iter in range(1,n_iters+1):
         hidden = rnn.init_hidden()
         rnn.zero_grad()
 
-        # Predict steer,acc and brake based on n_timesteps before
-        ix = random_integers(n_timesteps, f.data.shape[0])
-        for i in reversed(range(n_timesteps)):
+        # Predict steer, acc and brake based on n_timesteps before
+        ix = random_integers(n_timesteps_used+1, f.data.shape[0]-n_timesteps_used+1)
+        for i in reversed(range(n_timesteps_used+1)):
             output, hidden = rnn(f[ix-i:ix-i+1,:], hidden)
 
         loss = loss_func(output, t[i])
+        loss_vec.append(loss.data[0])
         loss.backward()
         if iter % 100 == 0:
-            print(loss)
+            print(iter,loss.data[0])
 
         # Add parameters' gradients to their values, multiplied by learning rate
         for p in rnn.parameters():
             p.data.add_(-learning_rate, p.grad.data)
-    return rnn
+    return rnn,loss_vec
 
 if __name__ == "__main__":
     # Train and test feed forward network
+    if len(sys.argv)==1:
+        print('Please provide an argument (ff or rnn)')
+        quit()
     if sys.argv[1] == 'ff':
         print('Training feed forward network...')
         t_head,f_head,t,f = load_data()
@@ -124,4 +192,16 @@ if __name__ == "__main__":
             print('Pred:',p)
     elif sys.argv[1] == 'rnn':
         print('Training recurrent neural network...')
-        net = train_rnn()
+        net,loss_vec = train_rnn()
+        import matplotlib.pyplot as plt
+        plt.plot(list(range(len(loss_vec))),loss_vec)
+        plt.show()
+    elif sys.argv[1] == 'lstm':
+        print('Training LSTM...')
+        net,loss_vec = train_lstm()
+        import matplotlib.pyplot as plt
+        plt.plot(list(range(len(loss_vec))),loss_vec)
+        plt.show()
+    else:
+        print('Please provide an argument (ff or rnn)')
+        quit()

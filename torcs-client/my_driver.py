@@ -1,6 +1,6 @@
 from pytocl.driver import Driver
 from pytocl.car import State, Command
-from intelligence.learning import train_ff_network
+from intelligence.learning import train_ff_network, train_rnn, train_lstm
 import torch
 from torch.autograd import Variable
 
@@ -11,8 +11,10 @@ from pytocl.analysis import DataLogWriter
 from pytocl.car import State, Command, MPS_PER_KMH
 from pytocl.controller import CompositeController, ProportionalController, \
     IntegrationController, DerivativeController
-
 _logger = logging.getLogger(__name__)
+
+USE_NET = "LSTM"
+N_TIMESTEPS = 2
 class MyDriver(Driver):
     def __init__(self, logdata=True):
         self.steering_ctrl = CompositeController(
@@ -24,7 +26,21 @@ class MyDriver(Driver):
             ProportionalController(3.7),
         )
         self.data_logger = DataLogWriter() if logdata else None
-        self.net = train_ff_network()
+
+        if USE_NET == "RNN":
+            self.net = train_rnn(N_TIMESTEPS)
+            var = Variable(torch.FloatTensor([0 for i in range(22)])).float()
+            self.feature_timesteps = [var.view(1,var.size()[0]) for j in range(N_TIMESTEPS)]
+            self.net, loss_vec = train_rnn(N_TIMESTEPS)
+        elif USE_NET == "LSTM":
+            self.net, loss_vec = train_lstm(N_TIMESTEPS)
+
+            # Initialize N_TIMESTEPS empty feature vectors
+            self.feature_timesteps = [[0 for i in range(22)] for j in range(N_TIMESTEPS)]
+            # self.feature_timesteps = [var.view(1,var.size()[0]) for j in range(N_TIMESTEPS)]
+        elif USE_ET == "FF":
+            self.net = train_ff_network()
+
 
     def drive(self, carstate: State) -> Command:
         """
@@ -42,12 +58,29 @@ class MyDriver(Driver):
         angle = [carstate.angle]
         track_edges = list(carstate.distances_from_edge)
         features = Variable(torch.FloatTensor(speed+track_pos+angle+track_edges)).float()
-        print(track_edges)
-        # Predict
-        pred = self.net(features)
+        features = features.view(1,features.size()[0])
+
+        if USE_NET == 'RNN':
+            # For rnn keep track of previous states
+            self.feature_timesteps.append(features)
+            self.feature_timesteps.pop(0)
+            hidden = self.net.init_hidden()
+            for prev_features in self.feature_timesteps:
+                pred, hidden = self.net(prev_features, hidden)
+            pred = pred.data.numpy()[0]
+        elif USE_NET == 'LSTM':
+            self.feature_timesteps.append(speed+track_pos+angle+track_edges)
+            self.feature_timesteps.pop(0)
+            hidden = self.net.init_hidden()
+            pred = self.net(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
+            pred = pred.data[-1,:].numpy()
+        elif USE_NET == 'FF':
+            pred = self.net(features)
+
         acc_pred = pred[0]
         brake_pred = pred[1]
         steer_pred = pred[2]
+        print('acc: {}, brake: {}, steer: {}'.format(round(acc_pred,2), round(brake_pred,2), round(steer_pred,2)))
 
         # Prepare gear
         if command.accelerator > 0:
