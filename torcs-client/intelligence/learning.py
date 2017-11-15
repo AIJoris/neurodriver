@@ -67,15 +67,15 @@ class LSTM(nn.Module):
         command = self.hidden2command(lstm_out.view(n_timesteps, -1))
         return command
 
-def train_lstm(N_TIMESTEPS = 3):
+def train_lstm(N_TIMESTEPS = 5):
     # Load our data
     t_head, f_head, t, f = load_data()
     print(t_head,t)
     print(f_head,f)
 
     # Create LSTM
-    HIDDEN_DIM = 32
-    L_RATE = 0.01
+    HIDDEN_DIM = 16
+    L_RATE = 0.001
     n_output = t.size()[1]
     n_features = f.size()[1]
     lstm = LSTM(n_features, HIDDEN_DIM, n_output)
@@ -83,8 +83,8 @@ def train_lstm(N_TIMESTEPS = 3):
     loss_vec = []
     optimizer = torch.optim.SGD(lstm.parameters(), lr = L_RATE)
     print(lstm)
-    for epoch in range(10):
-        for i in range(N_TIMESTEPS,n_features+1):
+    for epoch in range(2):
+        for i in range(N_TIMESTEPS,f.size()[0]+1):
             # Step 1. Remember that Pytorch accumulates gradients.
             # We need to clear them out before each instance
             lstm.zero_grad()
@@ -103,12 +103,14 @@ def train_lstm(N_TIMESTEPS = 3):
             #  calling optimizer.step()
             loss = loss_function(command, t[i-N_TIMESTEPS:i])
             loss_vec.append(loss.data[0])
+            if i % 100 == 0:
+                print(epoch,i,loss.data[0])
             loss.backward()
             optimizer.step()
     return lstm, loss_vec
 
 # Load training data
-def load_data(fpath = 'alpine-1.csv'):
+def load_data(fpath = 'f-speedway.csv'):
     # alpine-1
     if os.path.relpath(".","..") != 'intelligence':
         fpath = 'intelligence/'+fpath
