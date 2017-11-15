@@ -15,5 +15,24 @@
 - How to collect sensor data from manually driving the car?
 - How do we implement an Echo State Network? There aren't any good looking packages that we can find.
 
-## Planning week 3
-test
+## Week 3
+### Planning 
+- Create LSTM
+- Understand training data
+
+
+### Output
+- Produced training data based on rule based driving
+- Gained insight into driver calls (i.e. when is it called?)
+- LSTM working
+- Sent e-mail to Mark (call for help)
+
+### Questions
+- All versions of NN are not working on the data. Why is this? Maybe (3-target) regression is not the best solution?
+- Fundamental wrong approach (wait for e-mail Mark)?
+- Error in LSTM?
+- Reinforcement Learning?
+
+
+
+
