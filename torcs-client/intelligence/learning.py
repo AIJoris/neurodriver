@@ -9,6 +9,7 @@ import numpy as np
 from numpy.random import random_integers
 import os
 import sys
+import matplotlib.pyplot as plt
 
 ## Define feed forward network
 class FeedForwardNet(nn.Module):
@@ -63,28 +64,28 @@ class LSTM(nn.Module):
                 Variable(torch.zeros(1, 1, self.hidden_dim)))
 
     def forward(self, features, n_timesteps):
-        lstm_out, self.hidden = self.lstm(features.view(n_timesteps, 1, -1), self.hidden)
-        command = self.hidden2command(lstm_out.view(n_timesteps, -1))
+        lstm_out, self.hidden = self.lstm(features, self.hidden)
+        command = self.hidden2command(lstm_out)
         return command
 
-def train_lstm(N_TIMESTEPS = 5):
+def train_lstm(N_TIMESTEPS = 4):
     # Load our data
     t_head, f_head, t, f = load_data()
     print(t_head,t)
     print(f_head,f)
 
     # Create LSTM
-    HIDDEN_DIM = 16
-    L_RATE = 0.001
-    n_output = t.size()[1]
+    HIDDEN_DIM = 10
+    L_RATE = 0.0001
+    n_output = 1#t.size()[1]
     n_features = f.size()[1]
     lstm = LSTM(n_features, HIDDEN_DIM, n_output)
     loss_function = torch.nn.MSELoss()
     loss_vec = []
     optimizer = torch.optim.SGD(lstm.parameters(), lr = L_RATE)
     print(lstm)
-    for epoch in range(2):
-        for i in range(N_TIMESTEPS,f.size()[0]+1):
+    for epoch in range(1):
+        for i in range(N_TIMESTEPS, 5000):
             # Step 1. Remember that Pytorch accumulates gradients.
             # We need to clear them out before each instance
             lstm.zero_grad()
@@ -101,16 +102,17 @@ def train_lstm(N_TIMESTEPS = 5):
 
             # Step 4. Compute the loss, gradients, and update the parameters by
             #  calling optimizer.step()
-            loss = loss_function(command, t[i-N_TIMESTEPS:i])
+            loss = loss_function(command, t[i-N_TIMESTEPS:i,0])
             loss_vec.append(loss.data[0])
             if i % 100 == 0:
                 print(epoch,i,loss.data[0])
+                print('c',command.data.numpy()[0][0][0], 't',t[i-1,0].data.numpy()[0])
             loss.backward()
             optimizer.step()
     return lstm, loss_vec
 
 # Load training data
-def load_data(fpath = 'f-speedway.csv'):
+def load_data(fpath = 'out.csv'):
     # alpine-1
     if os.path.relpath(".","..") != 'intelligence':
         fpath = 'intelligence/'+fpath
@@ -128,19 +130,20 @@ def load_data(fpath = 'f-speedway.csv'):
 def train_ff_network():
     t_head, f_head, targets, features = load_data()
     print(t_head,f_head)
-    net = FeedForwardNet(n_feature=22, n_hidden1=15, n_hidden2=10, n_output=3)
+    net = FeedForwardNet(n_feature=22, n_hidden1=15, n_hidden2=30, n_output=3)
     print(net)
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.5)
+    optimizer = torch.optim.SGD(net.parameters(), lr=0.00001)
     loss_func = torch.nn.MSELoss()  # this is for regression mean squared loss
-
+    loss_vec = []
     # Train network
-    for t in range(30):
+    for t in range(1000):
         prediction = net(features)     # input x and predict based on x
         loss = loss_func(prediction, targets)     # must be (1. nn output, 2. target)
+        loss_vec.append(loss.data[0])
         optimizer.zero_grad()   # clear gradients for next train
         loss.backward()         # backpropagation, compute gradients
         optimizer.step()        # apply gradients
-    return net
+    return net, loss_vec
 
 def train_rnn(n_timesteps_used = 2):
     # Load our data
@@ -182,26 +185,27 @@ def train_rnn(n_timesteps_used = 2):
 if __name__ == "__main__":
     # Train and test feed forward network
     if len(sys.argv)==1:
-        print('Please provide an argument (ff or rnn)')
+        print('Please provide an argument (ff or rnn or lstm)')
         quit()
     if sys.argv[1] == 'ff':
         print('Training feed forward network...')
         t_head,f_head,t,f = load_data()
-        net = train_ff_network()
+        net, loss_vec = train_ff_network()
         pred = net(f).data.numpy()
         for i,p in enumerate(pred):
-            print('Target:', t.data.numpy()[i])
-            print('Pred:',p)
+            if i % 10000 == 0:
+                print('Target:', t.data.numpy()[i])
+                print('Pred:',p)
+        plt.plot(list(range(len(loss_vec))),loss_vec)
+        plt.show()
     elif sys.argv[1] == 'rnn':
         print('Training recurrent neural network...')
         net,loss_vec = train_rnn()
-        import matplotlib.pyplot as plt
         plt.plot(list(range(len(loss_vec))),loss_vec)
         plt.show()
     elif sys.argv[1] == 'lstm':
         print('Training LSTM...')
         net,loss_vec = train_lstm()
-        import matplotlib.pyplot as plt
         plt.plot(list(range(len(loss_vec))),loss_vec)
         plt.show()
     else:

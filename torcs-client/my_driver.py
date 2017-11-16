@@ -13,8 +13,8 @@ from pytocl.controller import CompositeController, ProportionalController, \
     IntegrationController, DerivativeController
 _logger = logging.getLogger(__name__)
 
-USE_NET = "LSTM"
-N_TIMESTEPS = 2
+USE_NET = "FF"
+N_TIMESTEPS = 10
 class MyDriver(Driver):
     def __init__(self, logdata=True):
         self.steering_ctrl = CompositeController(
@@ -86,17 +86,15 @@ class MyDriver(Driver):
         if command.accelerator > 0:
             if carstate.rpm > 8000:
                 command.gear = carstate.gear + 1
-        if carstate.rpm < 2500:
-            command.gear = carstate.gear - 1
+        # if carstate.rpm < 2500:
+            # command.gear = carstate.gear - 1
         if not command.gear:
             command.gear = carstate.gear or 1
 
         # Prepare command
-        command.accelerator = acc_pred.data[0]
-        command.brake = brake_pred.data[0]/10
-        command.steering = steer_pred.data[0]
-        # var = "acc: {}, brake: {}, steer: {}".format(command.accelerator,command.brake, command.steering)
-        # print('+', var)
+        command.accelerator = acc_pred
+        command.brake = 0
+        command.steering = steer_pred
 
         # self.steer(carstate, 0.0, command)
         # ACC_LATERAL_MAX = 6400 * 5
