@@ -33,6 +33,14 @@
 - Error in LSTM?
 - Reinforcement Learning?
 
+## Week 4
+### Planning
+- Feature whitening
+- Feature rescaling
+- Regularization (dropout)
+- Tanh or softmax output layer
+- Skeleton for NN part of report 
+
 
 
 
