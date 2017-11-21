@@ -13,16 +13,22 @@ import matplotlib.pyplot as plt
 
 ## Define feed forward network
 class FeedForwardNet(nn.Module):
-    def __init__(self, n_feature, n_hidden1, n_hidden2, n_output):
+    def __init__(self, n_feature, n_hidden1, n_hidden2, n_output, use_tanh= None):
         super(FeedForwardNet, self).__init__()
         self.hidden1 = torch.nn.Linear(n_feature, n_hidden1)   # hidden layer 1
         self.hidden2 = torch.nn.Linear(n_hidden1, n_hidden2)   # hidden layer 2
         self.predict = torch.nn.Linear(n_hidden2, n_output)   # output layer
+        self.use_tanh = use_tanh
 
     def forward(self, f):
         h1 = F.relu(self.hidden1(f))      # activation function for hidden layer 1
         h2 = F.relu(self.hidden2(h1))     # activation function for hidden layer 1
-        o = self.predict(h2)               # linear output
+        if self.use_tanh:
+            o = F.tanh(self.predict(h2))
+        elif not self.use_tanh:
+            o = F.softmax(self.predict(h2))
+        elif self.use_tanh is None:
+            o = o = self.predict(h2)
         return o
 
 ## Define Recurrent neural network architecture
@@ -85,7 +91,7 @@ def train_lstm(N_TIMESTEPS = 4):
     optimizer = torch.optim.SGD(lstm.parameters(), lr = L_RATE)
     print(lstm)
     for epoch in range(1):
-        for i in range(N_TIMESTEPS, 5000):
+        for i in range(N_TIMESTEPS, 500):
             # Step 1. Remember that Pytorch accumulates gradients.
             # We need to clear them out before each instance
             lstm.zero_grad()
@@ -112,7 +118,7 @@ def train_lstm(N_TIMESTEPS = 4):
     return lstm, loss_vec
 
 # Load training data
-def load_data(scale = False, fpath = 'out.csv'):
+def load_data(f_scale = False, fpath = 'out.csv'):
     # alpine-1
     if os.path.relpath(".","..") != 'intelligence':
         fpath = 'intelligence/'+fpath
@@ -125,31 +131,46 @@ def load_data(scale = False, fpath = 'out.csv'):
     features_header = header[3:]
     targets = Variable(torch.from_numpy(targets)).float()
     features = Variable(torch.from_numpy(features)).float()
-    if scale == True:
+    if f_scale == True:
         features = rescale(features)
     return target_header, features_header, targets,features
 
 def rescale(input):
-    return (input - torch.min(input, 0)[0]) / (torch.max(input,0)[0] - torch.min(input,0)[0])
+    mi = input - torch.min(input, 0)[0]
+    ma = torch.max(input,0)[0]
+    return (input - torch.min(input, 0)[0]) / (torch.max(input,0)[0] - torch.min(input,0)[0]), mi, ma
 
 def train_ff_network(scale = False):
-    t_head, f_head, targets, features = load_data(scale = scale)
+    t_head, f_head, targets, features = load_data(f_scale = scale)
+
     print(t_head,f_head)
-    net = FeedForwardNet(n_feature=22, n_hidden1=15, n_hidden2=8, n_output=3)
-    print(net)
+    # net = FeedForwardNet(n_feature=22, n_hidden1=15, n_hidden2=8, n_output=1, use_tanh = None)
+    net_steer = FeedForwardNet(n_feature=22, n_hidden1=15, n_hidden2=8, n_output=1, use_tanh = True)
+    net_speed = FeedForwardNet(n_feature=22, n_hidden1=15, n_hidden2=8, n_output=2, use_tanh = False)
+    # print(net)
     print('Rescaling features:', scale)
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.001)
+    # optimizer = torch.optim.SGD(net.parameters(), lr=0.001)
+    optimizer_steer = torch.optim.SGD(net_steer.parameters(), lr=0.001)
+    optimizer_speed = torch.optim.SGD(net_speed.parameters(), lr=0.001)
     loss_func = torch.nn.MSELoss()  # this is for regression mean squared loss
-    loss_vec = []
+    loss_vec_speed, loss_vec_steer = [], []
+    # loss_vec = []
+
     # Train network
-    for t in range(200):
-        prediction = net(features)     # input x and predict based on x
-        loss = loss_func(prediction, targets)     # must be (1. nn output, 2. target)
-        loss_vec.append(loss.data[0])
-        optimizer.zero_grad()   # clear gradients for next train
-        loss.backward()         # backpropagation, compute gradients
-        optimizer.step()        # apply gradients
-    return net, loss_vec
+    for t in range(1000):
+        prediction_steer, prediction_speed = net_steer(features), net_speed(features)
+        loss_steer, loss_speed = loss_func(prediction_steer, targets[:,-1:]), loss_func(prediction_speed, targets[:,:-1])
+        loss_vec_speed.append(loss_speed.data[0]), loss_vec_steer.append(loss_steer.data[0])
+        optimizer_steer.zero_grad(), optimizer_speed.zero_grad()
+        loss_steer.backward(), loss_speed.backward()
+        optimizer_steer.step(), optimizer_speed.step()
+        # prediction = net(features)     # input x and predict based on x
+        # loss = loss_func(prediction, targets)     # must be (1. nn output, 2. target)
+        # loss_vec.append(loss.data[0])
+        # optimizer.zero_grad()   # clear gradients for next train
+        # loss.backward()         # backpropagation, compute gradients
+        # optimizer.step()        # apply gradients
+    return net_speed, net_steer, loss_vec_speed, loss_vec_steer
 
 def train_rnn(n_timesteps_used = 2):
     # Load our data
@@ -195,17 +216,32 @@ if __name__ == "__main__":
         quit()
     if sys.argv[1] == 'ff':
         print('Training feed forward network...')
-        scale = False
-        t_head,f_head,t,f = load_data(scale = scale)
-        net, loss_vec = train_ff_network(scale = scale)
-        pred = net(f).data.numpy()
-        for i,p in enumerate(pred):
+        f_scale = False
+        t_head,f_head,t,f = load_data(f_scale = f_scale)
+        t[:,-1], min, max = rescale(t[:,-1])
+        # net = train_ff_network(scale = f_scale)
+        # pred = net(f).data.numpy()
+        net_speed, net_steer, loss_vec_speed, loss_vec_steer = train_ff_network(scale = f_scale)
+        pred_speed = net_speed(f).data.numpy()
+        pred_steer = net_steer(f).data.numpy()
+        for i,p in enumerate(pred_speed):
             if i % 10000 == 0:
-                print('Target:', t.data.numpy()[i])
-                print('Pred:',p)
-        plt.plot(list(range(len(loss_vec))),loss_vec)
-        print('Final loss:',loss_vec[-1])
+                print('Target acc/brake:', t.data.numpy()[i,0:-1])
+                print('Pred acc/brake:',p[0:-1])
+                print('Target steer:', t.data.numpy()[i,-1])
+                print('Pred steer:',pred_steer[i,-1])
+        # plt.plot(list(range(len(loss_vec))),loss_vec)
+        # print('Final loss:',loss_vec[-1])
+        # plt.show()
+        plt.plot(list(range(len(loss_vec_speed))),loss_vec_speed)
+        plt.title('speed')
+        print('Final loss speed:',loss_vec_speed[-1])
         plt.show()
+        plt.plot(list(range(len(loss_vec_steer))),loss_vec_steer)
+        plt.title('steer')
+        print('Final loss steer:',loss_vec_steer[-1])
+        plt.show()
+
     elif sys.argv[1] == 'rnn':
         print('Training recurrent neural network...')
         net,loss_vec = train_rnn()

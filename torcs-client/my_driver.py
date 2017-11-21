@@ -1,4 +1,5 @@
 from pytocl.driver import Driver
+import matplotlib.pyplot as plt
 from pytocl.car import State, Command
 from intelligence.learning import train_ff_network, train_rnn, train_lstm
 import torch
@@ -14,7 +15,7 @@ from pytocl.controller import CompositeController, ProportionalController, \
 _logger = logging.getLogger(__name__)
 
 USE_NET = "FF"
-N_TIMESTEPS = 10
+N_TIMESTEPS = 2
 SCALE = False
 class MyDriver(Driver):
     def __init__(self, logdata=True):
@@ -40,7 +41,11 @@ class MyDriver(Driver):
             self.feature_timesteps = [[0 for i in range(22)] for j in range(N_TIMESTEPS)]
             # self.feature_timesteps = [var.view(1,var.size()[0]) for j in range(N_TIMESTEPS)]
         elif USE_NET == "FF":
-            self.net, loss_vec = train_ff_network(scale = SCALE)
+            # self.net, self.loss_vec = train_ff_network(scale = SCALE)
+            self.net_speed, self.net_steer, self.loss_vec_speed, self.loss_vec_steer = train_ff_network(scale = SCALE)
+            # plt.plot(list(range(len(self.loss_vec))),self.loss_vec)
+            # print('Final loss:',self.loss_vec[-1])
+            # plt.show()
 
 
     def drive(self, carstate: State) -> Command:
@@ -74,15 +79,17 @@ class MyDriver(Driver):
             self.feature_timesteps.pop(0)
             hidden = self.net.init_hidden()
             pred = self.net(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
+            print('*'*80,pred)
             pred = pred.data[-1,:].numpy()
-        elif USE_NET == 'FF':
-            pred = self.net(features).data.numpy()[0]
+            # print(pred)
+            acc_pred = pred[0]
+            brake_pred = pred[1]/10
+            steer_pred = pred[2]
 
-        acc_pred = pred[0]
-        brake_pred = pred[1]
-        steer_pred = pred[2]
-        acc_pred = 1 if acc_pred > 1 else acc_pred
-        brake_pred = 0 if brake_pred < 0 else brake_pred
+        elif USE_NET == 'FF':
+            # pred = self.net(features).data.numpy()[0]
+            acc_pred, brake_pred = self.net_speed(features).data.numpy()[0]
+            steer_pred = self.net_steer(features).data.numpy()[0][0]
 
         print('Net: {}, acc: {}, brake: {}, steer: {}'.format(USE_NET, round(acc_pred,2), round(brake_pred,2), round(steer_pred,2)))
 
@@ -97,6 +104,7 @@ class MyDriver(Driver):
 
         # Prepare command
         command.accelerator = acc_pred
+        # command.brake = brake_pred
         command.brake = 0
         command.steering = steer_pred
 
