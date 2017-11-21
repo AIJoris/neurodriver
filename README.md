@@ -40,7 +40,7 @@
 - Regularization (dropout)
 - Tanh or softmax output layer
 - Skeleton for NN part of report 
-
+- Cap acc, break and steer manually
 
 
 
