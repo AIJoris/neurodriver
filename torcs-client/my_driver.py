@@ -38,8 +38,8 @@ class MyDriver(Driver):
             # Initialize N_TIMESTEPS empty feature vectors
             self.feature_timesteps = [[0 for i in range(22)] for j in range(N_TIMESTEPS)]
             # self.feature_timesteps = [var.view(1,var.size()[0]) for j in range(N_TIMESTEPS)]
-        elif USE_ET == "FF":
-            self.net = train_ff_network()
+        elif USE_NET == "FF":
+            self.net, loss_vec = train_ff_network()
 
 
     def drive(self, carstate: State) -> Command:
@@ -75,11 +75,12 @@ class MyDriver(Driver):
             pred = self.net(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
             pred = pred.data[-1,:].numpy()
         elif USE_NET == 'FF':
-            pred = self.net(features)
+            pred = self.net(features).data.numpy()[0]
 
         acc_pred = pred[0]
         brake_pred = pred[1]
         steer_pred = pred[2]
+        acc_pred
         print('acc: {}, brake: {}, steer: {}'.format(round(acc_pred,2), round(brake_pred,2), round(steer_pred,2)))
 
         # Prepare gear
