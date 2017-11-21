@@ -112,7 +112,7 @@ def train_lstm(N_TIMESTEPS = 4):
     return lstm, loss_vec
 
 # Load training data
-def load_data(fpath = 'out.csv'):
+def load_data(scale = False, fpath = 'out.csv'):
     # alpine-1
     if os.path.relpath(".","..") != 'intelligence':
         fpath = 'intelligence/'+fpath
@@ -125,18 +125,24 @@ def load_data(fpath = 'out.csv'):
     features_header = header[3:]
     targets = Variable(torch.from_numpy(targets)).float()
     features = Variable(torch.from_numpy(features)).float()
+    if scale == True:
+        features = rescale(features)
     return target_header, features_header, targets,features
 
-def train_ff_network():
-    t_head, f_head, targets, features = load_data()
+def rescale(input):
+    return (input - torch.min(input, 0)[0]) / (torch.max(input,0)[0] - torch.min(input,0)[0])
+
+def train_ff_network(scale = False):
+    t_head, f_head, targets, features = load_data(scale = scale)
     print(t_head,f_head)
-    net = FeedForwardNet(n_feature=22, n_hidden1=15, n_hidden2=30, n_output=3)
+    net = FeedForwardNet(n_feature=22, n_hidden1=15, n_hidden2=8, n_output=3)
     print(net)
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.00001)
+    print('Rescaling features:', scale)
+    optimizer = torch.optim.SGD(net.parameters(), lr=0.001)
     loss_func = torch.nn.MSELoss()  # this is for regression mean squared loss
     loss_vec = []
     # Train network
-    for t in range(1000):
+    for t in range(200):
         prediction = net(features)     # input x and predict based on x
         loss = loss_func(prediction, targets)     # must be (1. nn output, 2. target)
         loss_vec.append(loss.data[0])
@@ -189,14 +195,16 @@ if __name__ == "__main__":
         quit()
     if sys.argv[1] == 'ff':
         print('Training feed forward network...')
-        t_head,f_head,t,f = load_data()
-        net, loss_vec = train_ff_network()
+        scale = False
+        t_head,f_head,t,f = load_data(scale = scale)
+        net, loss_vec = train_ff_network(scale = scale)
         pred = net(f).data.numpy()
         for i,p in enumerate(pred):
             if i % 10000 == 0:
                 print('Target:', t.data.numpy()[i])
                 print('Pred:',p)
         plt.plot(list(range(len(loss_vec))),loss_vec)
+        print('Final loss:',loss_vec[-1])
         plt.show()
     elif sys.argv[1] == 'rnn':
         print('Training recurrent neural network...')

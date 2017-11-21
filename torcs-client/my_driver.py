@@ -15,6 +15,7 @@ _logger = logging.getLogger(__name__)
 
 USE_NET = "FF"
 N_TIMESTEPS = 10
+SCALE = False
 class MyDriver(Driver):
     def __init__(self, logdata=True):
         self.steering_ctrl = CompositeController(
@@ -39,7 +40,7 @@ class MyDriver(Driver):
             self.feature_timesteps = [[0 for i in range(22)] for j in range(N_TIMESTEPS)]
             # self.feature_timesteps = [var.view(1,var.size()[0]) for j in range(N_TIMESTEPS)]
         elif USE_NET == "FF":
-            self.net, loss_vec = train_ff_network()
+            self.net, loss_vec = train_ff_network(scale = SCALE)
 
 
     def drive(self, carstate: State) -> Command:
@@ -80,8 +81,10 @@ class MyDriver(Driver):
         acc_pred = pred[0]
         brake_pred = pred[1]
         steer_pred = pred[2]
-        acc_pred
-        print('acc: {}, brake: {}, steer: {}'.format(round(acc_pred,2), round(brake_pred,2), round(steer_pred,2)))
+        acc_pred = 1 if acc_pred > 1 else acc_pred
+        brake_pred = 0 if brake_pred < 0 else brake_pred
+
+        print('Net: {}, acc: {}, brake: {}, steer: {}'.format(USE_NET, round(acc_pred,2), round(brake_pred,2), round(steer_pred,2)))
 
         # Prepare gear
         if command.accelerator > 0:
