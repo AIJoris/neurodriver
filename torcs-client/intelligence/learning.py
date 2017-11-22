@@ -28,8 +28,47 @@ class FeedForwardNet(nn.Module):
         elif not self.use_tanh:
             o = F.softmax(self.predict(h2))
         elif self.use_tanh is None:
-            o = o = self.predict(h2)
+            o = self.predict(h2)
         return o
+
+
+class LSTM(nn.Module):
+    #def __init__(self, n_features, hidden_dim, output_size):
+    def __init__(self, n_features, hidden_dim, n_output, use_tanh= None):
+        super(LSTM, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.use_tanh = use_tanh
+
+        # The LSTM takes feature vectors as inputs, and outputs hidden states
+        # with dimensionality hidden_dim.
+        self.lstm = nn.LSTM(n_features, hidden_dim)
+
+
+        # The linear layer that maps from hidden state space to command space
+        self.hidden2command = nn.Linear(hidden_dim, n_output)
+        # tanh layer only used if use_tanh
+        #self.hidden2command_tanh = nn.Tanh(self.hidden2command(hidden_dim))
+        # sigmoid
+        #self.hidden2command_softmax = F.softmax(self.hidden2command(hidden_dim))
+        
+
+        self.hidden = self.init_hidden()
+
+    def init_hidden(self):
+        # return Variable(torch.zeros(1, 1, self.hidden_dim))
+        return (Variable(torch.zeros(1, 1, self.hidden_dim)),
+                Variable(torch.zeros(1, 1, self.hidden_dim)))
+
+    def forward(self, features, n_timesteps):
+        lstm_out, self.hidden = self.lstm(features, self.hidden)
+
+        if self.use_tanh:
+                command = nn.Tanh(self.hidden2command(lstm_out))
+        elif not self.use_tanh:
+                command = F.softmax(self.hidden2command(lstm_out))
+        elif self.use_tanh is None:
+                command = self.hidden2command(lstm_out)
+        return command
 
 ## Define Recurrent neural network architecture
 class RNN(nn.Module):
@@ -51,30 +90,8 @@ class RNN(nn.Module):
     def init_hidden(self):
         return Variable(torch.zeros(1, self.hidden_size))
 
-class LSTM(nn.Module):
-    def __init__(self, n_features, hidden_dim, output_size):
-        super(LSTM, self).__init__()
-        self.hidden_dim = hidden_dim
 
-        # The LSTM takes feature vectors as inputs, and outputs hidden states
-        # with dimensionality hidden_dim.
-        self.lstm = nn.LSTM(n_features, hidden_dim)
-
-        # The linear layer that maps from hidden state space to command space
-        self.hidden2command = nn.Linear(hidden_dim, output_size)
-        self.hidden = self.init_hidden()
-
-    def init_hidden(self):
-        # return Variable(torch.zeros(1, 1, self.hidden_dim))
-        return (Variable(torch.zeros(1, 1, self.hidden_dim)),
-                Variable(torch.zeros(1, 1, self.hidden_dim)))
-
-    def forward(self, features, n_timesteps):
-        lstm_out, self.hidden = self.lstm(features, self.hidden)
-        command = self.hidden2command(lstm_out)
-        return command
-
-def train_lstm(N_TIMESTEPS = 4):
+def train_lstm( n_output = 3, N_TIMESTEPS = 4, use_tanh=None):
     # Load our data
     t_head, f_head, t, f = load_data()
     print(t_head,t)
@@ -83,15 +100,26 @@ def train_lstm(N_TIMESTEPS = 4):
     # Create LSTM
     HIDDEN_DIM = 10
     L_RATE = 0.0001
-    n_output = 1#t.size()[1]
+    #n_output = 1#t.size()[1]
     n_features = f.size()[1]
-    lstm = LSTM(n_features, HIDDEN_DIM, n_output)
+
+
+    #lstm = LSTM(n_features, HIDDEN_DIM, n_output)
+
+
+    #n_feature, hidden_dim, output_size, use_tanh= None
+    lstm = LSTM(n_features, HIDDEN_DIM, n_output, use_tanh = use_tanh)
+
+    #net_steer = LSTM(n_feature=22, n_hidden1=15, n_hidden2=8, n_output=1, use_tanh = True)
+    #net_speed = LSTM(n_feature=22, n_hidden1=15, n_hidden2=8, n_output=2, use_tanh = False)
+
+
     loss_function = torch.nn.MSELoss()
     loss_vec = []
     optimizer = torch.optim.SGD(lstm.parameters(), lr = L_RATE)
     print(lstm)
     for epoch in range(1):
-        for i in range(N_TIMESTEPS, 500):
+        for i in range(N_TIMESTEPS, 10):
             # Step 1. Remember that Pytorch accumulates gradients.
             # We need to clear them out before each instance
             lstm.zero_grad()

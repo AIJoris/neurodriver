@@ -14,7 +14,7 @@ from pytocl.controller import CompositeController, ProportionalController, \
     IntegrationController, DerivativeController
 _logger = logging.getLogger(__name__)
 
-USE_NET = "FF"
+USE_NET = "LSTM"
 N_TIMESTEPS = 2
 SCALE = False
 class MyDriver(Driver):
@@ -35,7 +35,9 @@ class MyDriver(Driver):
             self.feature_timesteps = [var.view(1,var.size()[0]) for j in range(N_TIMESTEPS)]
             self.net, loss_vec = train_rnn(N_TIMESTEPS)
         elif USE_NET == "LSTM":
-            self.net, loss_vec = train_lstm(N_TIMESTEPS)
+            self.net_steer, loss_vec_steer = train_lstm(N_TIMESTEPS, 1, use_tanh = True)
+            self.net_speed, loss_vec_speed = train_lstm(N_TIMESTEPS, 2, use_tanh = False)
+
 
             # Initialize N_TIMESTEPS empty feature vectors
             self.feature_timesteps = [[0 for i in range(22)] for j in range(N_TIMESTEPS)]
@@ -78,13 +80,20 @@ class MyDriver(Driver):
             self.feature_timesteps.append(speed+track_pos+angle+track_edges)
             self.feature_timesteps.pop(0)
             hidden = self.net.init_hidden()
-            pred = self.net(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
-            print('*'*80,pred)
-            pred = pred.data[-1,:].numpy()
+
+            #pred = self.net(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
+            pred_steer = self.net_steer(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
+            pred_speed = self.net_speed(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
+
+            #print('*'*80,pred)
+            #pred = pred.data[-1,:].numpy()
             # print(pred)
-            acc_pred = pred[0]
-            brake_pred = pred[1]/10
-            steer_pred = pred[2]
+            #acc_pred = pred[0]
+            #brake_pred = pred[1]/10
+            #steer_pred = pred[2]
+
+            acc_pred = pred_speed.data[0].numpy()
+            steer_pred = pred_steer.data[0].numpy()
 
         elif USE_NET == 'FF':
             # pred = self.net(features).data.numpy()[0]
