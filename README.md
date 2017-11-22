@@ -38,9 +38,10 @@
 - Feature whitening
 - Feature rescaling
 - Regularization (dropout)
-- Tanh or softmax output layer
+- Tanh and softmax output layer in two different networks (This forces the network to have an output in the desired range)
 - Skeleton for NN part of report 
 - Cap acc, break and steer manually
+- Use PCA to reduce feature space (might help because sensors have a lot of overlap so this might reduce the amount of noice present in the features. As we are using a relatively small neural network, a smaller feature space could improve results)
 
 
 
