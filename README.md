@@ -44,4 +44,10 @@
 - Use PCA to reduce feature space (might help because sensors have a lot of overlap so this might reduce the amount of noice present in the features. As we are using a relatively small neural network, a smaller feature space could improve results)
 
 
-
+### NEAT Phase 2: 
+- Use simple bot to generate initial steer, acc and brake commands
+- One individual in the population is one (initially simple) network with as input all sensors, the opponent sensors and the steer, acc and brake. Output is the finetuned steer, acc and brake. 
+- The fitness function will be distance raced, cars overtaken, how much damage incurred and how long it's been off track.
+- Every 20 seconds of the race another individual will be tested and its fitness summed up. 
+- Before every individual switch, the car must be put in the middle of the track if it's been left off track.
+- 
