@@ -52,8 +52,9 @@
 - After a time (30 seconds), remove individual i from the steering wheel, use 5 second warmup time with simple bot, and switch to individual i+1
 - After all individuals have had their time (pauze game?), evaluate, select and mutate/recombine.
 - Test new population
+- http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.159.9589&rep=rep1&type=pdf
 
 ### Combine Phase 1 and Phase 2:
-a. Use the last hidden layer of Phase 1 as input to the to be evolved network from Phase 2 instead of regular sensorinput, along with the added (new) opponents data so it learns how to handle opponents.
-b.  Use all available sensor data and evolve from scratch.
-c.
+- Use the last hidden layer of Phase 1 as input to the to be evolved network from Phase 2 instead of regular sensorinput, along with the added (new) opponents data so it learns how to handle opponents.
+-  Use all available sensor data and evolve from scratch.
+- http://julian.togelius.com/Togelius2004Evolution.pdf
