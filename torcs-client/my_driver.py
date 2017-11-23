@@ -8,13 +8,14 @@ from torch.autograd import Variable
 # imports from driver.py
 import logging
 import math
+import time
 from pytocl.analysis import DataLogWriter
 from pytocl.car import State, Command, MPS_PER_KMH
 from pytocl.controller import CompositeController, ProportionalController, \
     IntegrationController, DerivativeController
 _logger = logging.getLogger(__name__)
 
-USE_NET = "LSTM"
+USE_NET = "FF"
 N_TIMESTEPS = 2
 SCALE = False
 class MyDriver(Driver):
@@ -68,62 +69,70 @@ class MyDriver(Driver):
         features = Variable(torch.FloatTensor(speed+track_pos+angle+track_edges)).float()
         features = features.view(1,features.size()[0])
 
-        if USE_NET == 'RNN':
-            # For rnn keep track of previous states
-            self.feature_timesteps.append(features)
-            self.feature_timesteps.pop(0)
-            hidden = self.net.init_hidden()
-            for prev_features in self.feature_timesteps:
-                pred, hidden = self.net(prev_features, hidden)
-            pred = pred.data.numpy()[0]
-        elif USE_NET == 'LSTM':
-            self.feature_timesteps.append(speed+track_pos+angle+track_edges)
-            self.feature_timesteps.pop(0)
-            hidden = self.net.init_hidden()
+        if min(track_edges) > 0.5:
+            if USE_NET == 'RNN':
+                # For rnn keep track of previous states
+                self.feature_timesteps.append(features)
+                self.feature_timesteps.pop(0)
+                hidden = self.net.init_hidden()
+                for prev_features in self.feature_timesteps:
+                    pred, hidden = self.net(prev_features, hidden)
+                pred = pred.data.numpy()[0]
+            elif USE_NET == 'LSTM':
+                self.feature_timesteps.append(speed+track_pos+angle+track_edges)
+                self.feature_timesteps.pop(0)
+                hidden = self.net.init_hidden()
 
-            #pred = self.net(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
-            pred_steer = self.net_steer(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
-            pred_speed = self.net_speed(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
+                #pred = self.net(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
+                pred_steer = self.net_steer(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
+                pred_speed = self.net_speed(Variable(torch.FloatTensor(self.feature_timesteps)), N_TIMESTEPS)
 
-            #print('*'*80,pred)
-            #pred = pred.data[-1,:].numpy()
-            # print(pred)
-            #acc_pred = pred[0]
-            #brake_pred = pred[1]/10
-            #steer_pred = pred[2]
+                #print('*'*80,pred)
+                #pred = pred.data[-1,:].numpy()
+                # print(pred)
+                #acc_pred = pred[0]
+                #brake_pred = pred[1]/10
+                #steer_pred = pred[2]
 
-            acc_pred = pred_speed.data[0].numpy()
-            steer_pred = pred_steer.data[0].numpy()
+                acc_pred = pred_speed.data[0].numpy()
+                steer_pred = pred_steer.data[0].numpy()
 
-        elif USE_NET == 'FF':
-            # pred = self.net(features).data.numpy()[0]
-            acc_pred, brake_pred = self.net_speed(features).data.numpy()[0]
-            steer_pred = self.net_steer(features).data.numpy()[0][0]
+            elif USE_NET == 'FF':
+                # pred = self.net(features).data.numpy()[0]
+                acc_pred, brake_pred = self.net_speed(features).data.numpy()[0]
+                steer_pred = self.net_steer(features).data.numpy()[0][0]
 
-        print('Net: {}, acc: {}, brake: {}, steer: {}'.format(USE_NET, round(acc_pred,2), round(brake_pred,2), round(steer_pred,2)))
+            # Prepare command
+            command.accelerator = acc_pred
+            # command.brake = brake_pred
+            command.brake = 0
+            command.steering = steer_pred
+
+            if track_edges[int((len(track_edges)-1)/2)] > 100:
+                print('Maximaal gaaasss\n\n\n')
+                command.accelerator = 1.0
+
+            # print('Net: {}, acc: {}, brake: {}, steer: {}'.format(USE_NET, round(acc_pred,2), round(brake_pred,2), round(steer_pred,2)))
+        else:
+            print('Bot used', time.time())
+            self.steer(carstate, 0.0, command)
 
         # Prepare gear
         if command.accelerator > 0:
             if carstate.rpm > 8000:
                 command.gear = carstate.gear + 1
-        # if carstate.rpm < 2500:
-            # command.gear = carstate.gear - 1
+        if carstate.rpm < 2500:
+            command.gear = carstate.gear - 1
         if not command.gear:
             command.gear = carstate.gear or 1
 
-        # Prepare command
-        command.accelerator = acc_pred
-        # command.brake = brake_pred
-        command.brake = 0
-        command.steering = steer_pred
-
-        # self.steer(carstate, 0.0, command)
         # ACC_LATERAL_MAX = 6400 * 5
         # v_x = min(80, math.sqrt(ACC_LATERAL_MAX / abs(command.steering)))
         # v_x = 80
         # self.accelerate(carstate, v_x, command)
-        # var = "acc: {}, brake: {}, steer: {}".format(command.accelerator,command.brake, command.steering)
-        # print('-', var)
+
+        var = "acc: {}, brake: {}, steer: {}".format(command.accelerator,command.brake, command.steering)
+        print('-', var)
 
         if self.data_logger:
             self.data_logger.log(carstate, command)
