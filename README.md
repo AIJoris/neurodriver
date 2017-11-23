@@ -42,12 +42,18 @@
 - Skeleton for NN part of report 
 - Cap acc, break and steer manually
 - Use PCA to reduce feature space (might help because sensors have a lot of overlap so this might reduce the amount of noice present in the features. As we are using a relatively small neural network, a smaller feature space could improve results)
+- Switch back to default bot when edge track sensors give value of -1 (off track)
+- Switch to simple full throttle bot when front sensors see no edge 
 
+### Online-line NEAT Phase 2:
+- Initialize a population of 100 individuals (simple FFNN without hidden layer and with 3 output nodes
+- Start a race with 100 laps.
+- Let individual i drive after bot warm-up, and save distance raced, cars overtaken/overtaken by, damage, time off track.
+- After a time (30 seconds), remove individual i from the steering wheel, use 5 second warmup time with simple bot, and switch to individual i+1
+- After all individuals have had their time (pauze game?), evaluate, select and mutate/recombine.
+- Test new population
 
-### NEAT Phase 2: 
-- Use simple bot to generate initial steer, acc and brake commands
-- One individual in the population is one (initially simple) network with as input all sensors, the opponent sensors and the steer, acc and brake. Output is the finetuned steer, acc and brake. 
-- The fitness function will be distance raced, cars overtaken, how much damage incurred and how long it's been off track.
-- Every 20 seconds of the race another individual will be tested and its fitness summed up. 
-- Before every individual switch, the car must be put in the middle of the track if it's been left off track.
-- 
+### Combine Phase 1 and Phase 2:
+a. Use the last hidden layer of Phase 1 as input to the to be evolved network from Phase 2 instead of regular sensorinput, along with the added (new) opponents data so it learns how to handle opponents.
+b.  Use all available sensor data and evolve from scratch.
+c.
