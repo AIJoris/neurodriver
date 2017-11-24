@@ -10,6 +10,7 @@ from numpy.random import random_integers
 import os
 import sys
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 ## Define feed forward network
 class FeedForwardNet(nn.Module):
@@ -50,7 +51,7 @@ class LSTM(nn.Module):
         #self.hidden2command_tanh = nn.Tanh(self.hidden2command(hidden_dim))
         # sigmoid
         #self.hidden2command_softmax = F.softmax(self.hidden2command(hidden_dim))
-        
+
 
         self.hidden = self.init_hidden()
 
@@ -146,7 +147,7 @@ def train_lstm( n_output = 3, N_TIMESTEPS = 4, use_tanh=None):
     return lstm, loss_vec
 
 # Load training data
-def load_data(f_scale = False, fpath = 'out.csv'):
+def load_data(f_scale = False, fpath = 'out.csv', pca=False):
     # alpine-1
     if os.path.relpath(".","..") != 'intelligence':
         fpath = 'intelligence/'+fpath
@@ -157,10 +158,17 @@ def load_data(f_scale = False, fpath = 'out.csv'):
     features = data[:,3:]
     target_header = header[0:3]
     features_header = header[3:]
+    if pca:
+        n_feature = 10
+        pca = PCA(n_components=n_feature)
+        pca.fit(features)
+        features = pca.transform(features)
+        print('Conserved variance ratio: ', np.sum(pca.explained_variance_ratio_))
+        print('features shape after PCA: ', features.shape)
     targets = Variable(torch.from_numpy(targets)).float()
     features = Variable(torch.from_numpy(features)).float()
     if f_scale == True:
-        features = rescale(features)
+        features, min, max = rescale(features)
     return target_header, features_header, targets,features
 
 def rescale(input):
@@ -168,18 +176,18 @@ def rescale(input):
     ma = torch.max(input,0)[0]
     return (input - torch.min(input, 0)[0]) / (torch.max(input,0)[0] - torch.min(input,0)[0]), mi, ma
 
-def train_ff_network(scale = False):
-    t_head, f_head, targets, features = load_data(f_scale = scale)
-
+def train_ff_network(scale = False, pca=False):
+    t_head, f_head, targets, features = load_data(f_scale = scale, pca=pca)
     print(t_head,f_head)
     # net = FeedForwardNet(n_feature=22, n_hidden1=15, n_hidden2=8, n_output=1, use_tanh = None)
-    net_steer = FeedForwardNet(n_feature=22, n_hidden1=15, n_hidden2=8, n_output=1, use_tanh = True)
-    net_speed = FeedForwardNet(n_feature=22, n_hidden1=15, n_hidden2=8, n_output=2, use_tanh = False)
+    n_feature = features.size()[1]
+    net_steer = FeedForwardNet(n_feature=n_feature, n_hidden1=15, n_hidden2=8, n_output=1, use_tanh = True)
+    net_speed = FeedForwardNet(n_feature=n_feature, n_hidden1=15, n_hidden2=8, n_output=2, use_tanh = False)
     # print(net)
     print('Rescaling features:', scale)
     # optimizer = torch.optim.SGD(net.parameters(), lr=0.001)
-    optimizer_steer = torch.optim.SGD(net_steer.parameters(), lr=0.001)
-    optimizer_speed = torch.optim.SGD(net_speed.parameters(), lr=0.001)
+    optimizer_steer = torch.optim.SGD(net_steer.parameters(), lr=0.03)
+    optimizer_speed = torch.optim.SGD(net_speed.parameters(), lr=0.02)
     loss_func = torch.nn.MSELoss()  # this is for regression mean squared loss
     loss_vec_speed, loss_vec_steer = [], []
     # loss_vec = []
@@ -244,20 +252,25 @@ if __name__ == "__main__":
         quit()
     if sys.argv[1] == 'ff':
         print('Training feed forward network...')
-        f_scale = False
-        t_head,f_head,t,f = load_data(f_scale = f_scale)
+        pca = False
+        f_scale = True
+        t_head,f_head,t,f = load_data(f_scale = f_scale, pca=pca)
+        _, _, t_valid, f_valid = load_data(f_scale=f_scale, fpath='e-track-4-custom.csv',)
         t[:,-1], min, max = rescale(t[:,-1])
         # net = train_ff_network(scale = f_scale)
         # pred = net(f).data.numpy()
-        net_speed, net_steer, loss_vec_speed, loss_vec_steer = train_ff_network(scale = f_scale)
+        net_speed, net_steer, loss_vec_speed, loss_vec_steer = train_ff_network(scale = f_scale, pca=pca)
         pred_speed = net_speed(f).data.numpy()
         pred_steer = net_steer(f).data.numpy()
+        loss = torch.nn.MSELoss()
         for i,p in enumerate(pred_speed):
             if i % 10000 == 0:
                 print('Target acc/brake:', t.data.numpy()[i,0:-1])
-                print('Pred acc/brake:',p[0:-1])
+                print('Pred acc/brake:',pred_speed[i])
                 print('Target steer:', t.data.numpy()[i,-1])
                 print('Pred steer:',pred_steer[i,-1])
+        # pred_speed_valid = net_speed(f_valid)
+        # pred_steer_valid = net_steer(f_valid)
         # plt.plot(list(range(len(loss_vec))),loss_vec)
         # print('Final loss:',loss_vec[-1])
         # plt.show()
@@ -268,6 +281,8 @@ if __name__ == "__main__":
         plt.plot(list(range(len(loss_vec_steer))),loss_vec_steer)
         plt.title('steer')
         print('Final loss steer:',loss_vec_steer[-1])
+        # print("acc/brake validation loss: ", loss(pred_speed_valid, t_valid[:,:-1]).data[0])
+        # print("steer validation loss: ", loss(pred_steer_valid, t_valid[:,-1:]).data[0])
         plt.show()
 
     elif sys.argv[1] == 'rnn':
