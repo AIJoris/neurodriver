@@ -18,6 +18,10 @@ _logger = logging.getLogger(__name__)
 USE_NET = "FF"
 N_TIMESTEPS = 2
 SCALE = False
+BOT_THRES = 0.5
+USE_BOT = False
+MAX_SPEED_ON_STRAIGHT = False
+
 class MyDriver(Driver):
     def __init__(self, logdata=True):
         self.steering_ctrl = CompositeController(
@@ -69,7 +73,7 @@ class MyDriver(Driver):
         features = Variable(torch.FloatTensor(speed+track_pos+angle+track_edges)).float()
         features = features.view(1,features.size()[0])
 
-        if min(track_edges) > 0.5:
+        if min(track_edges) > BOT_THRES and not USE_BOT:
             if USE_NET == 'RNN':
                 # For rnn keep track of previous states
                 self.feature_timesteps.append(features)
@@ -108,7 +112,7 @@ class MyDriver(Driver):
             command.brake = 0
             command.steering = steer_pred
 
-            if track_edges[int((len(track_edges)-1)/2)] > 100:
+            if track_edges[int((len(track_edges)-1)/2)] > 100 and MAX_SPEED_ON_STRAIGHT:
                 print('Maximaal gaaasss\n\n\n')
                 command.accelerator = 1.0
 
