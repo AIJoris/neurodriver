@@ -58,3 +58,14 @@
 - Use the last hidden layer of Phase 1 as input to the to be evolved network from Phase 2 instead of regular sensorinput, along with the added (new) opponents data so it learns how to handle opponents.
 -  Use all available sensor data and evolve from scratch.
 - http://julian.togelius.com/Togelius2004Evolution.pdf
+
+### Output
+- Online NEAT 
+- Half working warmup mechanism
+- Server restart
+
+# Week 5
+## Planning
+- Finish warmup procedure
+- Combine NN/bot commands with NEAT networks
+- Tweak fitness function
